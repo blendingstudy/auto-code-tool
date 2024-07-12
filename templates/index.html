@@ -3,22 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Flowchart Input</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Project Manager</title>
+    <style>
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            margin: auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-control {
+            width: 100%;
+            max-width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none; /* 크기 수정 불가능하게 설정 */
+        }
+        .form-control.textarea-large {
+            height: 100px;
+        }
+        .form-control.medium {
+            height: 40px;
+        }
+        .btn-primary, .btn-secondary {
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        .alert-danger {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        #response-container {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#load-project').click(function() {
+                var accountGuid = $('#account-guid').val();
+                var projectGuid = $('#project-guid').val();
+
+                $.ajax({
+                    url: '/load_project',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        account_guid: accountGuid,
+                        project_guid: projectGuid
+                    }),
+                    success: function(data) {
+                        if (data.exists) {
+                            var projectData = data.project_data;
+                            $('#project-description').val(projectData.project_description);
+                            $('#flowchart').val(projectData.flowchart);
+                            alert('Project loaded successfully.');
+                        } else {
+                            alert('Project not found.');
+                        }
+                    }
+                });
+            });
+
+            $('#generate-code-form').submit(function(event) {
+                event.preventDefault(); // 폼의 기본 제출 동작을 막습니다.
+
+                var accountGuid = $('#account-guid').val();
+                var projectGuid = $('#project-guid').val();
+                var projectDescription = $('#project-description').val();
+                var flowchart = $('#flowchart').val();
+
+                $.ajax({
+                    url: '/generate_code',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        account_guid: accountGuid,
+                        project_guid: projectGuid,
+                        project_description: projectDescription,
+                        flowchart: flowchart
+                    }),
+                    success: function(data) {
+                        $('#response-container').html('<pre>' + JSON.stringify(data, null, 2) + '</pre>');
+                    }
+                });
+            });
+        });
+    </script>
 </head>
 <body>
     <div class="container">
-        <h1>Enter Your Project Flowchart</h1>
-        <form method="POST" action="{{ url_for('index') }}">
-            {{ form.hidden_tag() }}
+        <div class="form-group">
+            <h2>Instructions</h2>
+            <p>Enter your account GUID, project GUID, project description, and flowchart to create or load a project.</p>
+        </div>
+        <div class="form-group">
+            <label for="account-guid">Account GUID:</label>
+            <input type="text" id="account-guid" name="account_guid" class="form-control medium" placeholder="Enter your account GUID...">
+        </div>
+        <div class="form-group">
+            <label for="project-guid">Project GUID:</label>
+            <input type="text" id="project-guid" name="project_guid" class="form-control medium" placeholder="Enter your project GUID...">
+        </div>
+        <div class="form-group">
+            <button type="button" id="load-project" class="btn btn-secondary">Load Project</button>
+        </div>
+        <form id="generate-code-form">
             <div class="form-group">
-                {{ form.flowchart.label(class="form-label") }}
-                {{ form.flowchart(class="form-control", rows=10, placeholder="Enter the project flowchart here...") }}
+                <label for="project-description">Project Description:</label>
+                <textarea id="project-description" name="project_description" class="form-control textarea-large" placeholder="Enter the project description...">가위바위보 게임을 만들건데. 사용자가 가위, 바위, 보 중에 하나를 선택하면 컴퓨터가 랜덤으로 하나를 골라서 승패를 결정하게 해줘.</textarea>
             </div>
             <div class="form-group">
-                {{ form.submit(class="btn btn-primary") }}
+                <label for="flowchart">Flowchart:</label>
+                <textarea id="flowchart" name="flowchart" class="form-control" rows="10" placeholder="Enter the project flowchart here...">1. 사용자가 [가위, 바위, 보] 중에 하나 선택
+2. 컴퓨터가 [가위, 바위, 보] 중에 랜덤으로 하나 선택
+3. 승패를 화면에 출력
+4. 다시하기 버튼을 누르면 다시 1번부터 진행</textarea>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Submit</button>
             </div>
         </form>
+        <div id="response-container"></div>
     </div>
 </body>
 </html>

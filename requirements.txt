@@ -2,3 +2,4 @@ Flask
 openai
 anthropic
 requests
+Flask-WTF

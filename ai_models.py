@@ -2,17 +2,16 @@ import openai
 import anthropic
 import requests
 import json
-from dotenv import load_dotenv
 import os
+import time
+from dotenv import load_dotenv
 
 load_dotenv()
-
 
 class AiType:
     GPT = 'gpt'
     ANTHROPIC = 'anthropic'
     CLOVARX = 'clovar'
-
 
 class Gpt:
     def __init__(self):
@@ -26,18 +25,16 @@ class Gpt:
     def request(self, messages):
         client = self.__set_api_key()
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=messages,
             max_tokens=4096,
             temperature=0.2,
         )
         return response.choices[0].message.content
 
-
 class Anthropic3:
     def __init__(self):
-        self.client = anthropic.Client(
-            api_key=os.environ.get('Anthropic3API'))
+        self.client = anthropic.Client(api_key=os.environ.get('Anthropic3API'))
 
     def request(self, msg=None):
         common_params = {
@@ -48,7 +45,6 @@ class Anthropic3:
         }
         response = self.client.messages.create(**common_params)
         return response.content[0].text
-
 
 class ClovarX:
     host = os.environ.get('CloverHost')
@@ -76,8 +72,7 @@ class ClovarX:
             answer = json.loads(lines[-6].decode("utf-8")[5:])
             return answer["message"]["content"]
 
-    def request(self, messages, topP=0.47, topK=0, maxTokens=762, temperature=0.16, repeatPenalty=0.16, stopBefore=[],
-                includeAiFilters=False, seed=0):
+    def request(self, messages, topP=0.47, topK=0, maxTokens=762, temperature=0.16, repeatPenalty=0.16, stopBefore=[], includeAiFilters=False, seed=0):
         request_data = {
             'messages': messages,
             'topP': topP,
@@ -91,11 +86,9 @@ class ClovarX:
         }
         return self.execute(request_data)
 
-
 gpt = Gpt()
 anthropic3 = Anthropic3()
 clovar_x = ClovarX()
-
 
 def gpt_request(prompt, ai_type=AiType.GPT):
     messages = [{"role": "user", "content": prompt}]
@@ -105,3 +98,14 @@ def gpt_request(prompt, ai_type=AiType.GPT):
         return anthropic3.request(messages)
     elif ai_type == AiType.CLOVARX:
         return clovar_x.request(messages)
+
+# Helper function to handle rate limit errors and retry
+def gpt_request_with_retry(prompt, ai_type=AiType.GPT, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            return gpt_request(prompt, ai_type)
+        except openai.error.RateLimitError as e:
+            retry_after = e.response.headers.get("Retry-After", 20)  # Default to 20 seconds
+            print(f"Rate limit exceeded. Retrying in {retry_after} seconds...")
+            time.sleep(float(retry_after))
+    raise Exception("Rate limit exceeded after retries")

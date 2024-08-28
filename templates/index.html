@@ -110,6 +110,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function() {
+
             $('#load-project').click(function() {
                 var accountGuid = $('#account-guid').val();
                 var projectGuid = $('#project-guid').val();
@@ -142,6 +143,25 @@
                         }
                     }
                 });
+            });
+
+            $('#flowchart-option').change(function() {
+                const selectedOption = $(this).val();
+                if (selectedOption === 'new') {
+                    $('#new-flowchart-container').show();
+                    $('#modify-flowchart-container').hide();
+                    $('#add-feature-container').hide();
+                } else if (selectedOption === 'modify') {
+                    $('#new-flowchart-container').hide();
+                    $('#modify-flowchart-container').show();
+                    $('#add-feature-container').hide();
+                    loadExistingFlowchart();  // 기존 Flowchart를 불러옴
+
+                } else if (selectedOption === 'add') {
+                    $('#new-flowchart-container').hide();
+                    $('#modify-flowchart-container').hide();
+                    $('#add-feature-container').show();
+                }
             });
 
             $('#generate-code-form').submit(function(event) {
@@ -220,7 +240,7 @@
                     }),
                     success: function(data) {
                         $('#status-message').text('프로젝트 코드 생성완료');
-                        displayFileList(data.Files);
+                        displayFileList(data.files);
                     },
                     error: function() {
                         $('#status-message').text('오류가 발생했습니다. 다시 시도해주세요.');
@@ -228,17 +248,59 @@
                 });
             });
 
+            $('#modify-code-form').submit(function(event) {
+                event.preventDefault(); // 폼의 기본 제출 동작을 막습니다.
+
+                var accountGuid = $('#account-guid').val();
+                var projectGuid = $('#project-guid').val();
+                var codeModificationPrompt = $('#code-modification-prompt').val();
+                var selectedFiles = [];
+
+                $('#file-modify-list input[type="checkbox"]:checked').each(function() {
+                    var fileInfo = $(this).closest('li').data('fileInfo');
+                    selectedFiles.push(fileInfo);
+                });
+
+                $('#code-modification-status-message').text('코드 수정 요청 중...');
+
+                $.ajax({
+                    url: $('#modify-code-form').attr('action'), // 폼의 action 속성을 참조
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        account_guid: accountGuid,
+                        project_guid: projectGuid,
+                        code_modification_prompt: codeModificationPrompt,
+                        selected_files: selectedFiles
+                    }),
+                    success: function(data) {
+                        $('#code-modification-status-message').text('코드 수정 완료');
+                        if (data.files) {
+                            displayFileList(data.files);
+                        }
+                    },
+                    error: function() {
+                        $('#code-modification-status-message').text('오류가 발생했습니다. 다시 시도해주세요.');
+                    }
+                });
+            });
+
             function displayFileList(files) {
                 var fileListElement = $('#file-list');
+                var fileModifyListElement = $('#file-modify-list');
                 fileListElement.empty();
+                fileModifyListElement.empty();
                 files.forEach(function(file) {
                     var listItem = $('<li></li>').text(file.fname);
+                    var checkbox = $('<input type="checkbox">');
+                    listItem.prepend(checkbox);
                     listItem.data('fileInfo', file);
                     listItem.click(function() {
                         var fileInfo = $(this).data('fileInfo');
                         requestFileCode(fileInfo);
                     });
                     fileListElement.append(listItem);
+                    fileModifyListElement.append(listItem.clone(true));
                 });
             }
 
@@ -275,6 +337,64 @@
                     });
                 }
             });
+            $('#run-project').click(function() {
+                var accountGuid = $('#account-guid').val();
+                var projectGuid = $('#project-guid').val();
+
+                $('#status-message').text('프로젝트 실행 중...');
+
+                $.ajax({
+                    url: '/run_project',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        account_guid: accountGuid,
+                        project_guid: projectGuid
+                    }),
+                    success: function(data) {
+                        if (data.error) {
+                            $('#status-message').text('에러: ' + data.error);
+                            var logsHtml = data.logs ? '<pre>' + data.logs.join('\n') + '</pre>' : '';
+                            $('#project-output-container').html('<div class="alert alert-danger">프로젝트 실행 중 오류가 발생했습니다: ' + data.error + logsHtml + '</div>');
+                        } else {
+                            $('#status-message').text('프로젝트 실행 완료');
+                            // URL이 정상적으로 반환된 경우, iframe에 로드
+                            $('#project-output').attr('src', data.url);
+                        }
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var errorMessage = jqXHR.responseJSON && jqXHR.responseJSON.error ? jqXHR.responseJSON.error : '알 수 없는 오류가 발생했습니다.';
+                        var logsHtml = jqXHR.responseJSON && jqXHR.responseJSON.logs ? '<pre>' + jqXHR.responseJSON.logs.join('\n') + '</pre>' : '';
+
+                        $('#status-message').text('프로젝트 실행 중 오류가 발생했습니다.');
+                        $('#project-output-container').html('<div class="alert alert-danger">프로젝트 실행 중 오류가 발생했습니다: ' + errorMessage + logsHtml + '</div>');
+                    }
+                });
+            });
+            function loadExistingFlowchart() {
+                var accountGuid = $('#account-guid').val();
+                var projectGuid = $('#project-guid').val();
+
+                $.ajax({
+                    url: '/get_flowchart',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        account_guid: accountGuid,
+                        project_guid: projectGuid
+                    }),
+                    success: function(data) {
+                        if (data.flowchart) {
+                            $('#modification-prompt').val(data.flowchart);  // 기존 Flowchart를 텍스트 에어리어에 표시
+                        } else {
+                            alert('기존 Flowchart를 불러오지 못했습니다.');
+                        }
+                    },
+                    error: function() {
+                        alert('Flowchart를 불러오는 중 오류가 발생했습니다.');
+                    }
+                });
+            }
         });
     </script>
 </head>
@@ -289,29 +409,44 @@
             <input type="text" id="project-guid" name="project_guid" class="form-control medium" value="test">
         </div>
         <button id="load-project" class="btn btn-secondary">Load Project</button>
-        <form id="generate-code-form">
-            <div class="form-group">
-                <label for="project-description">Project Description:</label>
-                <textarea id="project-description" name="project_description" class="form-control textarea-large" placeholder="Enter the project description...">가위바위보 게임을 만들건데. 사용자가 가위, 바위, 보 중에 하나를 선택하면 컴퓨터가 랜덤으로 하나를 골라서 승패를 결정하게 해줘.</textarea>
-            </div>
-            <div class="form-group">
-                <label for="flowchart">Flowchart:</label>
-                <textarea id="flowchart" name="flowchart" class="form-control textarea-large" placeholder="Enter the flowchart...">1. 사용자가 [가위, 바위, 보] 중에 하나 선택
+        <div class="form-group">
+                    <label for="project-description">Project Description:</label>
+                    <textarea id="project-description" name="project_description" class="form-control textarea-large" placeholder="Enter the project description...">
+가위바위보 게임을 만들건데. 사용자가 가위, 바위, 보 중에 하나를 선택하면 컴퓨터가 랜덤으로 하나를 골라서 승패를 결정하게 해줘.
+                    </textarea>
+                </div>
+        <div class="form-group">
+            <label for="flowchart-option">Flowchart Option:</label>
+            <select id="flowchart-option" class="form-control medium">
+                <option value="new">새로운 Flowchart</option>
+                <option value="modify">Flowchart 수정하기</option>
+                <option value="add">새로운 기능 추가하기</option>
+            </select>
+        </div>
+
+        <!-- 새로운 Flowchart 생성 -->
+        <div id="new-flowchart-container" class="form-group">
+            <form id="generate-code-form">
+
+                <div class="form-group">
+                    <label for="flowchart">Flowchart:</label>
+                    <textarea id="flowchart" name="flowchart" class="form-control textarea-large" placeholder="Enter the flowchart...">
+1. 사용자가 [가위, 바위, 보] 중에 하나 선택
 2. 컴퓨터가 [가위, 바위, 보] 중에 랜덤으로 하나 선택
 3. 승패를 화면에 출력
-4. 다시하기 버튼을 누르면 다시 1번부터 진행</textarea>
-            </div>
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary">Generate Code</button>
-                <div id="status-message"></div>
-            </div>
-        </form>
-        <div id="response-container"></div>
-        <div id="function-call-chart-container" class="form-group">
-            <h3>Function Call Chart</h3>
+4. 다시하기 버튼을 누르면 다시 1번부터 진행
+                    </textarea>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Generate Code</button>
+                    <div id="status-message"></div>
+                </div>
+            </form>
         </div>
-        <div id="modify-function-chart-container" class="form-group">
-            <h3>Modify Function Call Chart</h3>
+
+        <!-- Flowchart 수정하기 -->
+        <div id="modify-flowchart-container" class="form-group" style="display: none;">
+            <h3>Modify Existing Flowchart</h3>
             <form id="modify-function-chart-form">
                 <textarea id="modification-prompt" name="modification_prompt" class="form-control textarea-large" placeholder="Enter modification prompt..."></textarea>
                 <div class="form-group">
@@ -320,9 +455,53 @@
             </form>
             <div id="modification-status-message"></div>
         </div>
-        <div id="generate-code-container" class="form-group">
-            <button type="button" id="generate-project-code" class="btn btn-primary">Generate Project Code</button>
+
+        <!-- 새로운 기능 추가하기 -->
+        <div id="add-feature-container" class="form-group" style="display: none;">
+            <h3>Add New Feature</h3>
+            <form id="add-feature-form">
+                <textarea id="new-feature-description" name="new_feature_description" class="form-control textarea-large" placeholder="Enter new feature description..."></textarea>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Add Feature</button>
+                </div>
+            </form>
+            <div id="new-feature-status-message"></div>
         </div>
+
+<!--        <form id="generate-code-form">-->
+<!--            <div class="form-group">-->
+<!--                <label for="project-description">Project Description:</label>-->
+<!--                <textarea id="project-description" name="project_description" class="form-control textarea-large" placeholder="Enter the project description...">가위바위보 게임을 만들건데. 사용자가 가위, 바위, 보 중에 하나를 선택하면 컴퓨터가 랜덤으로 하나를 골라서 승패를 결정하게 해줘.</textarea>-->
+<!--            </div>-->
+<!--            <div class="form-group">-->
+<!--                <label for="flowchart">Flowchart:</label>-->
+<!--                <textarea id="flowchart" name="flowchart" class="form-control textarea-large" placeholder="Enter the flowchart...">1. 사용자가 [가위, 바위, 보] 중에 하나 선택-->
+<!--2. 컴퓨터가 [가위, 바위, 보] 중에 랜덤으로 하나 선택-->
+<!--3. 승패를 화면에 출력-->
+<!--4. 다시하기 버튼을 누르면 다시 1번부터 진행</textarea>-->
+<!--            </div>-->
+<!--            <div class="form-group">-->
+<!--                <button type="submit" class="btn btn-primary">Generate Code</button>-->
+<!--                <div id="status-message"></div>-->
+<!--            </div>-->
+<!--        </form>-->
+<!--        <div id="response-container"></div>-->
+<!--        <div id="function-call-chart-container" class="form-group">-->
+<!--            <h3>Function Call Chart</h3>-->
+<!--        </div>-->
+<!--        <div id="modify-function-chart-container" class="form-group">-->
+<!--            <h3>Modify Function Call Chart</h3>-->
+<!--            <form id="modify-function-chart-form">-->
+<!--                <textarea id="modification-prompt" name="modification_prompt" class="form-control textarea-large" placeholder="Enter modification prompt..."></textarea>-->
+<!--                <div class="form-group">-->
+<!--                    <button type="submit" class="btn btn-primary">Submit Modification</button>-->
+<!--                </div>-->
+<!--            </form>-->
+<!--            <div id="modification-status-message"></div>-->
+<!--        </div>-->
+<!--        <div id="generate-code-container" class="form-group">-->
+<!--            <button type="button" id="generate-project-code" class="btn btn-primary">Generate Project Code</button>-->
+<!--        </div>-->
         <div class="file-container">
             <div class="left-column">
                 <h2>파일 목록</h2>
@@ -333,6 +512,27 @@
                 <textarea id="code-display" class="form-control" style="height: 600px;"></textarea>
                 <button type="button" id="save-file" class="btn btn-primary">Save</button>
             </div>
+        </div>
+        <div id="modify-code-container" class="form-group">
+            <h3>Modify Code</h3>
+            <form id="modify-code-form" action="/modify_code">
+                <textarea id="code-modification-prompt" name="code_modification_prompt" class="form-control textarea-large" placeholder="Enter code modification prompt..."></textarea>
+                <div class="form-group">
+                    <h4>Select files to modify:</h4>
+                    <ul id="file-modify-list" class="file-list"></ul>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Submit Code Modification</button>
+                </div>
+            </form>
+            <div id="code-modification-status-message"></div>
+        </div>
+        <div id="run-project-container" class="form-group">
+            <button type="button" id="run-project" class="btn btn-success">Run Project</button>
+        </div>
+        <div id="project-output-container" class="form-group">
+            <h3>Project Output</h3>
+            <iframe id="project-output" style="width: 100%; height: 600px; border: 1px solid #ccc;"></iframe>
         </div>
     </div>
 </body>

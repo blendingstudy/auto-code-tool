@@ -104,7 +104,7 @@ def gpt_request_with_retry(prompt, ai_type=AiType.GPT, max_retries=5):
     for attempt in range(max_retries):
         try:
             return gpt_request(prompt, ai_type)
-        except openai.error.RateLimitError as e:
+        except openai.RateLimitError as e:
             retry_after = e.response.headers.get("Retry-After", 20)  # Default to 20 seconds
             print(f"Rate limit exceeded. Retrying in {retry_after} seconds...")
             time.sleep(float(retry_after))

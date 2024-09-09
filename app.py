@@ -196,9 +196,15 @@ def modify_function_call_chart():
     except json.JSONDecodeError as e:
         return jsonify({'error': '응답을 JSON으로 파싱하는데 실패했습니다.', 'details': str(e)}), 500
 
+    # 수정된 Flowchart를 project_data에 업데이트하여 저장
+    project_data['flowchart'] = modification_prompt
+    project_data['gpt_request'] = response
+    save_project_data(project_data)  # 프로젝트 데이터를 저장
+
     save_function_call_chart(formatted_response)
 
     return jsonify({'formatted_response': formatted_response})
+
 
 
 @app.route('/generate_project_code', methods=['POST'])
@@ -272,6 +278,86 @@ def generate_project_code():
         t.join()
 
     return jsonify(code_structure)
+
+
+@app.route('/update_project_code', methods=['POST'])
+def update_project_code():
+    global account_guid, project_guid
+
+    data = request.get_json()
+    account_guid = data['account_guid']
+    project_guid = data['project_guid']
+
+    project_data_path = f'code/{account_guid}/{project_guid}/project_data.json'
+    code_structure_path = f'code/{account_guid}/{project_guid}/code_structure.json'
+
+    if not os.path.exists(project_data_path) or not os.path.exists(code_structure_path):
+        return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
+
+    with open(project_data_path, 'r') as f:
+        project_data = json.load(f)
+        project_description = project_data['project_description']
+        flowchart = project_data['flowchart']
+        function_call_chart = project_data['gpt_request']
+
+    with open(code_structure_path, 'r') as f:
+        code_structure = json.load(f)
+
+    prompt = f"{project_description}\n\n{flowchart}\n\n{function_call_chart}\n\n"
+    prompt += "위에 적어 놓은 설명과 수정된 flow chart를 이용해서 기존 코드를 최대한 유지하면서 새로운 기능만 추가해줘. 기존 기능은 수정하지 말고, 새로운 기능만 반영할 수 있도록 코드를 수정해줘. 답변은 json으로만 해줘. 파싱하기 위함이라 다른걸로 하면 안돼."
+
+    # 선택한 파일들의 내용을 포함
+    prompt += "기존 파일들의 내용:\n"
+    for file_info in code_structure['Files']:
+        file_path = f'code/{account_guid}/{project_guid}/{file_info["path"]}/{file_info["fname"]}'
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                file_content = f.read()
+            prompt += f"파일: {file_info['fname']} 내용:\n{file_content}\n\n"
+
+    prompt += "위 파일들을 수정하여 새로운 코드를 생성해주세요. JSON 형식으로만 응답해줘."
+
+    response = gpt_request_with_retry(prompt)
+    print(response)
+    try:
+        if response.strip().startswith("```json"):
+            response = response.strip()[7:-3].strip()
+        if not response:
+            return jsonify({'error': '빈 JSON 응답입니다.'}), 500
+        response_json = json.loads(response)
+    except json.JSONDecodeError as e:
+        return jsonify({'error': '응답을 JSON으로 파싱하는데 실패했습니다.', 'details': str(e)}), 500
+
+    # 파일 저장 로직 수정
+    for fname, file_info in response_json.items():
+        # code_structure에서 해당 파일의 경로를 찾음
+        path = ''
+        for file in code_structure['Files']:
+            if file['fname'] == fname:
+                path = file.get('path', '')
+                break
+
+        # file_info가 문자열인지 확인하고, content가 문자열이면 그대로 사용
+        if isinstance(file_info, dict):
+            content = file_info.get('content', '')
+        else:
+            content = file_info  # file_info가 문자열일 경우 그대로 content로 사용
+
+        save_file(path, fname, content)
+
+    return jsonify({'status': 'success', 'files': response_json})
+
+
+def save_modified_files(modified_files):
+    global account_guid, project_guid
+
+    for file_info in modified_files.get('modified_files', []):
+        path = file_info['path']
+        content = file_info['content']
+        file_path = f'code/{account_guid}/{project_guid}/{path}'
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w') as file:
+            file.write(content)
 
 
 @app.route('/load_project', methods=['POST'])
@@ -689,7 +775,23 @@ def run_project():
     if not os.path.exists(project_path):
         return jsonify({'error': 'app 폴더를 찾을 수 없습니다.'}), 404
 
+    # 포트 5001이 이미 사용 중인지 확인하고, 사용 중인 경우 프로세스를 종료합니다.
     try:
+        # 포트가 사용 중인지 확인하는 명령
+        command_check = 'lsof -i :5001'
+        process_check = subprocess.Popen(shlex.split(command_check), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process_check.communicate()
+
+        # 포트가 사용 중일 때, 결과를 분석하여 해당 프로세스를 종료
+        if stdout:
+            # lsof 결과에서 PID를 추출하여 프로세스를 종료
+            for line in stdout.decode().splitlines():
+                if "LISTEN" in line:
+                    parts = line.split()
+                    pid = parts[1]  # PID는 두 번째 열에 있습니다.
+                    subprocess.call(['kill', '-9', pid])
+                    time.sleep(1)  # 프로세스 종료 대기 시간
+
         # Flask 서버를 subprocess로 실행
         env = os.environ.copy()
         env["FLASK_APP"] = "app.py"
@@ -722,6 +824,7 @@ def run_project():
         return jsonify({'error': 'Flask 서버 실행 시간이 초과되었습니다.'}), 500
     except Exception as e:
         return jsonify({'error': f'Flask 서버 실행 중 오류: {str(e)}'}), 500
+
 
 
 def save_file(path, fname, content):

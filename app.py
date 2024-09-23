@@ -793,16 +793,26 @@ def run_project():
                     time.sleep(1)  # 프로세스 종료 대기 시간
 
         # Flask 서버를 subprocess로 실행
-        env = os.environ.copy()
-        env["FLASK_APP"] = "app.py"
-        command = 'flask run --host=0.0.0.0 --port=6001'
+        # env = os.environ.copy()
+        # env["FLASK_APP"] = "app.py"
+        # command = 'flask run --host=0.0.0.0 --port=6001'
+        #
+        # process = subprocess.Popen(
+        #     shlex.split(command),
+        #     cwd=project_path,
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        #     env=env,
+        #     bufsize=1,
+        #     universal_newlines=True
+        # )
 
+        command = 'python -m flask run --host=0.0.0.0 --port=6001'
         process = subprocess.Popen(
             shlex.split(command),
-            cwd=project_path,
+            cwd=project_path,  # Flask 앱의 경로
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=env,
             bufsize=1,
             universal_newlines=True
         )

@@ -134,7 +134,7 @@ def generate_code():
 
     path = f'code/{account_guid}/{project_guid}/project_data.json'
     if os.path.exists(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             project_data = json.load(f)
             existing_description = project_data['project_description']
             is_new_project = False
@@ -182,7 +182,7 @@ def modify_function_call_chart():
     if not os.path.exists(path):
         return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
 
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding='utf-8') as f:
         project_data = json.load(f)
 
     existing_chart = project_data.get('gpt_request', "")
@@ -222,12 +222,12 @@ def generate_project_code():
     if not os.path.exists(function_call_path):
         return jsonify({'error': 'function call chart not found'}), 404
 
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding='utf-8') as f:
         project_data = json.load(f)
         project_description = project_data['project_description']
         flowchart = project_data['flowchart']
 
-    with open(function_call_path, 'r') as f:
+    with open(function_call_path, 'r', encoding='utf-8') as f:
         function_call_chart_content = f.read()
 
     prompt = f"{project_description}\n\n{flowchart}\n\n{function_call_chart_content}\n\n"
@@ -294,13 +294,13 @@ def update_project_code():
     if not os.path.exists(project_data_path) or not os.path.exists(code_structure_path):
         return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
 
-    with open(project_data_path, 'r') as f:
+    with open(project_data_path, 'r', encoding='utf-8') as f:
         project_data = json.load(f)
         project_description = project_data['project_description']
         flowchart = project_data['flowchart']
         function_call_chart = project_data['gpt_request']
 
-    with open(code_structure_path, 'r') as f:
+    with open(code_structure_path, 'r', encoding='utf-8') as f:
         code_structure = json.load(f)
 
     prompt = f"{project_description}\n\n{flowchart}\n\n{function_call_chart}\n\n"
@@ -311,7 +311,7 @@ def update_project_code():
     for file_info in code_structure['Files']:
         file_path = f'code/{account_guid}/{project_guid}/{file_info["path"]}/{file_info["fname"]}'
         if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 file_content = f.read()
             prompt += f"파일: {file_info['fname']} 내용:\n{file_content}\n\n"
 
@@ -370,7 +370,7 @@ def load_project():
 
     path = f'code/{account_guid}/{project_guid}/project_data.json'
     if os.path.exists(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             project_data = json.load(f)
         function_call_chart = load_function_call_chart()
         files = load_file_list(account_guid, project_guid)
@@ -390,7 +390,7 @@ def get_file_code():
 
     file_path = f'code/{account_guid}/{project_guid}/{path}/{fname}'
     if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             code = file.read()
         return jsonify({"code": code})
     else:
@@ -490,7 +490,7 @@ def implement_file(file_info, full_code_structure):
         for root, dirs, files in os.walk(base_path):
             for file in files:
                 if file != fname:  # 현재 생성 중인 파일은 제외
-                    with open(os.path.join(root, file), 'r') as f:
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         file_content = f.read()
                         previous_files_content += f"\n\n# {file} 내용:\n{file_content}\n"
 
@@ -626,13 +626,13 @@ def modify_code():
     if not os.path.exists(project_data_path) or not os.path.exists(code_structure_path):
         return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
 
-    with open(project_data_path, 'r') as f:
+    with open(project_data_path, 'r', encoding='utf-8') as f:
         project_data = json.load(f)
         project_description = project_data['project_description']
         flowchart = project_data['flowchart']
         function_call_chart = project_data['gpt_request']
 
-    with open(code_structure_path, 'r') as f:
+    with open(code_structure_path, 'r', encoding='utf-8') as f:
         code_structure = json.load(f)
 
     prompt = f"{project_description}\n\n{flowchart}\n\n{function_call_chart}\n\n"
@@ -644,7 +644,7 @@ def modify_code():
     for file_info in selected_files:
         file_path = f'code/{account_guid}/{project_guid}/{file_info["path"]}/{file_info["fname"]}'
         if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 file_content = f.read()
             prompt += f"파일: {file_info['fname']} 내용:\n{file_content}\n\n"
 
@@ -694,7 +694,7 @@ def get_flowchart():
     if not os.path.exists(project_data_path):
         return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
 
-    with open(project_data_path, 'r') as f:
+    with open(project_data_path, 'r', encoding='utf-8') as f:
         project_data = json.load(f)
         flowchart = project_data.get('flowchart', '')
 
@@ -715,13 +715,13 @@ def add_feature():
     if not os.path.exists(project_data_path) or not os.path.exists(code_structure_path):
         return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
 
-    with open(project_data_path, 'r') as f:
+    with open(project_data_path, 'r', encoding='utf-8') as f:
         project_data = json.load(f)
         project_description = project_data['project_description']
         flowchart = project_data['flowchart']
         function_call_chart = project_data['gpt_request']
 
-    with open(code_structure_path, 'r') as f:
+    with open(code_structure_path, 'r', encoding='utf-8') as f:
         code_structure = json.load(f)
 
     # 기존 플로우차트와 기능 호출표에 새로운 기능을 추가하는 프롬프트 생성
@@ -869,7 +869,7 @@ def load_function_call_chart():
 
     path = f'code/{account_guid}/{project_guid}/function_call_chart.txt'
     if os.path.exists(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             return f.read()
     return ""
 

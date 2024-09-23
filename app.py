@@ -778,7 +778,7 @@ def run_project():
     # 포트 5001이 이미 사용 중인지 확인하고, 사용 중인 경우 프로세스를 종료합니다.
     try:
         # 포트가 사용 중인지 확인하는 명령
-        command_check = 'lsof -i :5001'
+        command_check = 'lsof -i :6001'
         process_check = subprocess.Popen(shlex.split(command_check), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process_check.communicate()
 
@@ -795,7 +795,7 @@ def run_project():
         # Flask 서버를 subprocess로 실행
         env = os.environ.copy()
         env["FLASK_APP"] = "app.py"
-        command = 'flask run --host=0.0.0.0 --port=5001'
+        command = 'flask run --host=0.0.0.0 --port=6001'
 
         process = subprocess.Popen(
             shlex.split(command),
@@ -812,7 +812,7 @@ def run_project():
 
         # 서버가 정상적으로 실행되었는지 확인하고, 결과 반환
         if process.poll() is None:
-            return jsonify({'url': 'http://localhost:5001/'})
+            return jsonify({'url': 'http://localhost:6001/'})
         else:
             # 오류가 발생한 경우, 로그를 전송
             stdout, stderr = process.communicate(timeout=5)
